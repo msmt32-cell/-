@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>자연수산 전복치패 양식관리</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background: #f3f6f8;
+      color: #1f2937;
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 30px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .subtitle {
+      margin: 6px 0 0;
+      color: #64748b;
+      font-size: 14px;
+    }
+    .badge {
+      background: #0f766e;
+      color: white;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+    .card h2, .card h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .muted {
+      color: #64748b;
+      font-size: 13px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .field {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 14px;
+      background: white;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #0f766e;
+      color: white;
+    }
+    .btn-outline {
+      background: white;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      background: #eef2f7;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: #475569;
+    }
+    .shed-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .shed-box, .list-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 14px;
+      background: white;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 720px;
+      overflow: auto;
+    }
+    .task-top, .log-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .status {
+      display: inline-block;
+      margin-top: 10px;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .status.done {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status.wait {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .small {
+      font-size: 13px;
+    }
+    @media (max-width: 900px) {
+      .grid-3, .main-grid, .field-grid, .shed-grid {
+        grid-template-columns: 1fr;
+      }
+      .title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <h1 class="title">자연수산 전복치패 양식관리</h1>
+        <p class="subtitle">총 5동 관리, 판뒤집기는 우선 4동 34칸 기준으로 체크</p>
+      </div>
+      <div class="badge">1인 관리용</div>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <h3>평균 수온</h3>
+        <div id="avgTemp" class="stat-value">-°C</div>
+        <div class="muted">기록된 전체 아침·저녁 평균</div>
+      </div>
+      <div class="card">
+        <h3>누적 사료량</h3>
+        <div id="totalFeed" class="stat-value">- kg</div>
+        <div class="muted">입력된 일자 기준 누적</div>
+      </div>
+      <div class="card">
+        <h3>4동 판뒤집기</h3>
+        <div id="weeklyProgress" class="stat-value">0 / 34</div>
+        <div class="muted">선택 주차 완료 수조</div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div>
+        <div class="card">
+          <h2>일일 기록 입력</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="date">날짜</label>
+              <input id="date" type="date" />
+            </div>
+            <div class="field">
+              <label for="feedQty">사료 투입 수량 (kg)</label>
+              <input id="feedQty" type="number" placeholder="예: 12" />
+            </div>
+            <div class="field">
+              <label for="morningTemp">아침 수온 (°C)</label>
+              <input id="morningTemp" type="number" step="0.1" placeholder="예: 17.5" />
+            </div>
+            <div class="field">
+              <label for="eveningTemp">저녁 수온 (°C)</label>
+              <input id="eveningTemp" type="number" step="0.1" placeholder="예: 18.2" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="note">메모</label>
+            <textarea id="note" placeholder="특이사항, 폐사, 물색, 작업 내용 등을 적어두세요"></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="saveDailyLog()">저장 / 같은 날짜 수정</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>동별 수조 현황</h2>
+          <div id="shedGrid" class="shed-grid"></div>
+        </div>
+
+        <div class="card">
+          <h2>일일 기록 목록</h2>
+          <div id="dailyList" class="list"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>4동 판뒤집기 등록</h2>
+          <div class="field">
+            <label for="weekStart">주 시작일</label>
+            <input id="weekStart" type="date" />
+          </div>
+          <div class="field">
+            <label for="tank">수조</label>
+            <select id="tank"></select>
+          </div>
+          <div class="field">
+            <label for="taskMemo">메모</label>
+            <textarea id="taskMemo" placeholder="예: 이끼 많음, 상태 재확인"></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="saveTaskMemo()">수조 메모 저장</button>
+            <button class="btn-outline" onclick="resetWeek()">주간 초기화</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>4동 판뒤집기 체크</h2>
+          <div id="pendingCount" class="muted" style="margin-bottom: 12px;">미완료 34칸</div>
+          <div id="taskList" class="list"></div>
+        </div>
+
+        <div class="card">
+          <h2>오늘 확인</h2>
+          <div class="small" style="line-height:1.9; color:#475569;">
+            <div>오늘 날짜: <strong id="todayDate"></strong></div>
+            <div>아침 수온: <strong id="todayMorning">미입력</strong></div>
+            <div>저녁 수온: <strong id="todayEvening">미입력</strong></div>
+            <div>사료량: <strong id="todayFeed">미입력</strong></div>
+          </div>
+          <p class="muted" style="margin-top: 10px;">지금 버전은 입력 내용이 기기 브라우저에 자동 저장됩니다. 홈화면에 추가해서 앱처럼 쓸 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHEDS = [
+      { name: '1동', tanks: 41 },
+      { name: '2동', tanks: 38 },
+      { name: '3동', tanks: 35 },
+      { name: '4동', tanks: 34 },
+      { name: '5동', tanks: 0 }
+    ];
+
+    const FOURTH_SHED_TANKS = Array.from({ length: 34 }, (_, i) => `${i + 1}번 수조`);
+
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function startOfWeek(dateStr) {
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      return monday.toISOString().slice(0, 10);
+    }
+
+    function formatKg(value) {
+      if (value === '' || value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+      return `${Number(value).toLocaleString()} kg`;
+    }
+
+    function createDefaultWeeklyTasks(weekStart) {
+      return FOURTH_SHED_TANKS.map((tank, idx) => ({
+        id: idx + 1,
+        weekStart,
+        shed: '4동',
+        tank,
+        completed: false,
+        memo: ''
+      }));
+    }
+
+    let dailyLogs = JSON.parse(localStorage.getItem('abalone-daily-logs') || 'null') || [
+      { id: 1, date: todayStr(), morningTemp: '', eveningTemp: '', feedQty: '', note: '' }
+    ];
+
+    let weeklyTasks = JSON.parse(localStorage.getItem('abalone-weekly-tasks') || 'null') || createDefaultWeeklyTasks(startOfWeek(todayStr()));
+
+    function saveStorage() {
+      localStorage.setItem('abalone-daily-logs', JSON.stringify(dailyLogs));
+      localStorage.setItem('abalone-weekly-tasks', JSON.stringify(weeklyTasks));
+    }
+
+    function getSelectedWeek() {
+      return document.getElementById('weekStart').value || startOfWeek(todayStr());
+    }
+
+    function setupInputs() {
+      document.getElementById('date').value = todayStr();
+      document.getElementById('weekStart').value = startOfWeek(todayStr());
+
+      const tankSelect = document.getElementById('tank');
+      tankSelect.innerHTML = FOURTH_SHED_TANKS.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    function saveDailyLog() {
+      const form = {
+        date: document.getElementById('date').value,
+        morningTemp: document.getElementById('morningTemp').value,
+        eveningTemp: document.getElementById('eveningTemp').value,
+        feedQty: document.getElementById('feedQty').value,
+        note: document.getElementById('note').value
+      };
+
+      if (!form.date) return;
+
+      const idx = dailyLogs.findIndex(log => log.date === form.date);
+      if (idx >= 0) {
+        dailyLogs[idx] = { ...dailyLogs[idx], ...form };
+      } else {
+        dailyLogs.unshift({ id: Date.now(), ...form });
+      }
+
+      document.getElementById('morningTemp').value = '';
+      document.getElementById('eveningTemp').value = '';
+      document.getElementById('feedQty').value = '';
+      document.getElementById('note').value = '';
+
+      saveStorage();
+      render();
+    }
+
+    function saveTaskMemo() {
+      const weekStart = getSelectedWeek();
+      const tank = document.getElementById('tank').value;
+      const memo = document.getElementById('taskMemo').value;
+
+      let existing = weeklyTasks.find(task => task.weekStart === weekStart && task.tank === tank);
+      if (existing) {
+        existing.memo = memo;
+      } else {
+        weeklyTasks.unshift({
+          id: Date.now(),
+          weekStart,
+          shed: '4동',
+          tank,
+          completed: false,
+          memo
+        });
+      }
+
+      document.getElementById('taskMemo').value = '';
+      saveStorage();
+      render();
+    }
+
+    function resetWeek() {
+      const weekStart = getSelectedWeek();
+      weeklyTasks = weeklyTasks.filter(task => task.weekStart !== weekStart);
+      weeklyTasks = [...createDefaultWeeklyTasks(weekStart), ...weeklyTasks];
+      saveStorage();
+      render();
+    }
+
+    function toggleTask(id) {
+      weeklyTasks = weeklyTasks.map(task => task.id === id ? { ...task, completed: !task.completed } : task);
+      saveStorage();
+      render();
+    }
+
+    function deleteDailyLog(id) {
+      dailyLogs = dailyLogs.filter(log => log.id !== id);
+      saveStorage();
+      render();
+    }
+
+    function renderSheds() {
+      document.getElementById('shedGrid').innerHTML = SHEDS.map(shed => `
+        <div class="shed-box">
+          <div style="font-weight:700;">${shed.name}</div>
+          <div class="muted" style="margin-top:4px;">수조 ${shed.tanks}칸</div>
+        </div>
+      `).join('');
+    }
+
+    function renderDailyList() {
+      const sorted = [...dailyLogs].sort((a, b) => b.date.localeCompare(a.date));
+      const el = document.getElementById('dailyList');
+      if (!sorted.length) {
+        el.innerHTML = '<div class="muted">기록이 없습니다.</div>';
+        return;
+      }
+      el.innerHTML = sorted.map(log => `
+        <div class="list-item">
+          <div class="log-top">
+            <div>
+              <div style="font-weight:700; margin-bottom:8px;">${log.date}</div>
+              <div class="pill-row">
+                <span class="pill">아침 ${log.morningTemp || '-'}°C</span>
+                <span class="pill">저녁 ${log.eveningTemp || '-'}°C</span>
+                <span class="pill">사료 ${formatKg(log.feedQty)}</span>
+              </div>
+              ${log.note ? `<div class="muted" style="margin-top:8px;">${log.note}</div>` : ''}
+            </div>
+            <button class="btn-outline" onclick="deleteDailyLog(${log.id})">삭제</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTaskList() {
+      const weekStart = getSelectedWeek();
+      let selectedWeekTasks = weeklyTasks.filter(task => task.weekStart === weekStart);
+
+      if (!selectedWeekTasks.length) {
+        selectedWeekTasks = createDefaultWeeklyTasks(weekStart);
+        weeklyTasks = [...selectedWeekTasks, ...weeklyTasks];
+        saveStorage();
+      }
+
+      selectedWeekTasks.sort((a, b) => parseInt(a.tank) - parseInt(b.tank));
+
+      const done = selectedWeekTasks.filter(t => t.completed).length;
+      const pending = selectedWeekTasks.length - done;
+
+      document.getElementById('weeklyProgress').textContent = `${done} / ${selectedWeekTasks.length}`;
+      document.getElementById('pendingCount').textContent = `미완료 ${pending}칸`;
+
+      document.getElementById('taskList').innerHTML = selectedWeekTasks.map(task => `
+        <div class="list-item">
+          <div class="task-top">
+            <div>
+              <div style="font-weight:700;">4동 · ${task.tank}</div>
+              <div class="muted" style="margin-top:4px;">주 시작: ${task.weekStart}</div>
+              <div class="muted" style="margin-top:4px;">${task.memo || '메모 없음'}</div>
+              <span class="status ${task.completed ? 'done' : 'wait'}">${task.completed ? '완료' : '대기중'}</span>
+            </div>
+            <button class="btn-outline" onclick="toggleTask(${task.id})">${task.completed ? '되돌리기' : '완료 처리'}</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderToday() {
+      const today = todayStr();
+      const todayLog = dailyLogs.find(log => log.date === today);
+      document.getElementById('todayDate').textContent = today;
+      document.getElementById('todayMorning').textContent = todayLog?.morningTemp ? `${todayLog.morningTemp}°C` : '미입력';
+      document.getElementById('todayEvening').textContent = todayLog?.eveningTemp ? `${todayLog.eveningTemp}°C` : '미입력';
+      document.getElementById('todayFeed').textContent = todayLog?.feedQty ? `${todayLog.feedQty} kg` : '미입력';
+    }
+
+    function renderStats() {
+      const temps = dailyLogs.flatMap(log => [Number(log.morningTemp || 0), Number(log.eveningTemp || 0)]).filter(Boolean);
+      const avgTemp = temps.length ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : '-';
+      const totalFeed = dailyLogs.reduce((sum, log) => sum + Number(log.feedQty || 0), 0);
+      document.getElementById('avgTemp').textContent = `${avgTemp}°C`;
+      document.getElementById('totalFeed').textContent = formatKg(totalFeed);
+    }
+
+    function render() {
+      renderStats();
+      renderSheds();
+      renderDailyList();
+      renderTaskList();
+      renderToday();
+    }
+
+    document.getElementById('weekStart').addEventListener('change', render);
+
+    setupInputs();
+    render();
+  </script>
+</body>
+</html>
