@@ -1,642 +1,141 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ClipboardList, Coins, Fish, Home, Plus, Trash2, Bell, Smartphone, Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-
-const STORAGE_KEY = "abalone-farm-manager-v2";
-
-const defaultData = {
-  notificationEnabled: false,
-  dailyRecords: [],
-  inventory: [
-    { building: "1동", count: 0, note: "" },
-    { building: "2동", count: 0, note: "" },
-    { building: "3동", count: 0, note: "" },
-    { building: "4동", count: 0, note: "" },
-    { building: "5동", count: 0, note: "" },
-  ],
-  expenses: [
-    { id: crypto.randomUUID(), date: todayString(), category: "사료비", amount: 0, note: "" },
-  ],
-  sales: [],
-  calendarMemos: [],
-};
-
-function todayString() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function currency(value) {
-  return new Intl.NumberFormat("ko-KR").format(Number(value || 0));
-}
-
-function monthLabel(dateString) {
-  const date = new Date(dateString);
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
-}
-
-function getMonthDays(baseDate) {
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startWeekday = firstDay.getDay();
-  const daysInMonth = lastDay.getDate();
-
-  const cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let day = 1; day <= daysInMonth; day++) {
-    cells.push(new Date(year, month, day));
-  }
-  return cells;
-}
+import React, { useState, useEffect } from "react";
 
 function App() {
-  const [data, setData] = useState(defaultData);
-  const [activeTab, setActiveTab] = useState("home");
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const notifiedKeysRef = useRef(new Set());
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [tab, setTab] = useState("home");
 
-  const [recordForm, setRecordForm] = useState({
-    date: todayString(),
-    building: "4동",
-    morningTemp: "",
-    eveningTemp: "",
-    feedAmount: "",
-    flippedPlates: false,
-    note: "",
+  const [inventory, setInventory] = useState({
+    "1동": 0,
+    "2동": 0,
+    "3동": 0,
+    "4동": 0,
+    "5동": 0,
   });
 
-  const [expenseForm, setExpenseForm] = useState({
-    date: todayString(),
-    category: "사료비",
-    amount: "",
-    note: "",
+  const [expenses, setExpenses] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [memos, setMemos] = useState([]);
+
+  const [newMemo, setNewMemo] = useState({
+    date: "",
+    text: "",
   });
 
-  const [saleForm, setSaleForm] = useState({
-    date: todayString(),
-    item: "치패",
-    quantity: "",
-    unitPrice: "",
-    note: "",
-  });
-
-  const [memoForm, setMemoForm] = useState({
-    date: todayString(),
-    title: "",
-    detail: "",
-    type: "일정",
-  });
-
+  // 저장
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setData(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
+    localStorage.setItem("farmData", JSON.stringify({ inventory, expenses, sales, memos }));
+  }, [inventory, expenses, sales, memos]);
+
+  // 불러오기
+  useEffect(() => {
+    const data = JSON.parse(localStorage.getItem("farmData"));
+    if (data) {
+      setInventory(data.inventory);
+      setExpenses(data.expenses);
+      setSales(data.sales);
+      setMemos(data.memos);
     }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
-
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  useEffect(() => {
-    if (!data.notificationEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
-    const today = todayString();
-    const todayMemos = data.calendarMemos.filter((m) => m.date === today);
-    todayMemos.forEach((memo) => {
-      const key = `${memo.id}-${memo.date}`;
-      if (!notifiedKeysRef.current.has(key)) {
-        new Notification(`오늘 일정: ${memo.title}`, {
-          body: memo.detail || `${memo.date} · ${memo.type}`,
-        });
-        notifiedKeysRef.current.add(key);
-      }
-    });
-  }, [data.calendarMemos, data.notificationEnabled]);
-
-  const totalInventory = useMemo(() => {
-    return data.inventory.reduce((sum, item) => sum + Number(item.count || 0), 0);
-  }, [data.inventory]);
-
-  const totalExpense = useMemo(() => {
-    return data.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  }, [data.expenses]);
-
-  const totalSales = useMemo(() => {
-    return data.sales.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
-  }, [data.sales]);
-
-  const netProfit = totalSales - totalExpense;
-
-  const todayMemoCount = useMemo(() => {
-    return data.calendarMemos.filter((m) => m.date === todayString()).length;
-  }, [data.calendarMemos]);
-
-  const upcomingMemos = useMemo(() => {
-    return [...data.calendarMemos]
-      .filter((m) => m.date >= todayString())
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 8);
-  }, [data.calendarMemos]);
-
-  const recentRecords = useMemo(() => {
-    return [...data.dailyRecords].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
-  }, [data.dailyRecords]);
-
-  const memosByDate = useMemo(() => {
-    const map = {};
-    for (const memo of data.calendarMemos) {
-      if (!map[memo.date]) map[memo.date] = [];
-      map[memo.date].push(memo);
-    }
-    return map;
-  }, [data.calendarMemos]);
-
-  const monthDays = getMonthDays(selectedMonth);
-
-  function addDailyRecord() {
-    const newRecord = { id: crypto.randomUUID(), ...recordForm };
-    setData((prev) => ({ ...prev, dailyRecords: [newRecord, ...prev.dailyRecords] }));
-    setRecordForm({ ...recordForm, morningTemp: "", eveningTemp: "", feedAmount: "", flippedPlates: false, note: "" });
-  }
-
-  function updateInventory(index, key, value) {
-    setData((prev) => ({
-      ...prev,
-      inventory: prev.inventory.map((item, i) => (i === index ? { ...item, [key]: key === "count" ? Number(value || 0) : value } : item)),
-    }));
-  }
-
-  function addExpense() {
-    const entry = { id: crypto.randomUUID(), ...expenseForm, amount: Number(expenseForm.amount || 0) };
-    setData((prev) => ({ ...prev, expenses: [entry, ...prev.expenses] }));
-    setExpenseForm({ ...expenseForm, amount: "", note: "" });
-  }
-
-  function addSale() {
-    const entry = {
-      id: crypto.randomUUID(),
-      ...saleForm,
-      quantity: Number(saleForm.quantity || 0),
-      unitPrice: Number(saleForm.unitPrice || 0),
-    };
-    setData((prev) => ({ ...prev, sales: [entry, ...prev.sales] }));
-    setSaleForm({ ...saleForm, quantity: "", unitPrice: "", note: "" });
-  }
-
-  function addMemo() {
-    const entry = { id: crypto.randomUUID(), ...memoForm };
-    setData((prev) => ({ ...prev, calendarMemos: [...prev.calendarMemos, entry] }));
-    setMemoForm({ ...memoForm, title: "", detail: "" });
-  }
-
-  function deleteItem(section, id) {
-    setData((prev) => ({ ...prev, [section]: prev[section].filter((item) => item.id !== id) }));
-  }
-
-  async function enableNotifications() {
-    if (!("Notification" in window)) {
-      alert("이 기기 또는 브라우저에서는 알림을 지원하지 않습니다.");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      setData((prev) => ({ ...prev, notificationEnabled: true }));
-      new Notification("알림이 켜졌습니다", { body: "오늘 일정과 메모를 앱 실행 시 알려줍니다." });
-    }
-  }
-
-  async function installApp() {
-    if (!deferredPrompt) {
-      alert("지금은 설치 창을 바로 띄울 수 없습니다. 브라우저 메뉴의 '홈 화면에 추가' 또는 '앱 설치'를 사용해 주세요.");
-      return;
-    }
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-  }
+  const totalInventory = Object.values(inventory).reduce((a, b) => a + b, 0);
+  const totalExpense = expenses.reduce((a, b) => a + b.amount, 0);
+  const totalSales = sales.reduce((a, b) => a + b.amount, 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-3xl bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">자연수산 전복치패 양식관리</h1>
-              <p className="mt-2 text-sm text-slate-500">기록 · 개체수 · 수익 · 일정메모를 한곳에서 관리하는 확장 버전</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Badge className="rounded-full px-4 py-2 text-sm">오늘 메모 {todayMemoCount}건</Badge>
-              <Badge variant="secondary" className="rounded-full px-4 py-2 text-sm">총 개체수 {currency(totalInventory)}마리</Badge>
-            </div>
-          </div>
-        </div>
+    <div style={{ padding: 20 }}>
+      <h1>전복 치패 관리</h1>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid h-auto w-full grid-cols-3 gap-2 rounded-2xl bg-transparent p-0 md:grid-cols-6">
-            <TabsTrigger value="home" className="rounded-2xl border bg-white py-3"><Home className="mr-2 h-4 w-4" />홈</TabsTrigger>
-            <TabsTrigger value="records" className="rounded-2xl border bg-white py-3"><ClipboardList className="mr-2 h-4 w-4" />기록</TabsTrigger>
-            <TabsTrigger value="inventory" className="rounded-2xl border bg-white py-3"><Fish className="mr-2 h-4 w-4" />개체수</TabsTrigger>
-            <TabsTrigger value="profit" className="rounded-2xl border bg-white py-3"><Coins className="mr-2 h-4 w-4" />수익관리</TabsTrigger>
-            <TabsTrigger value="calendar" className="rounded-2xl border bg-white py-3"><CalendarDays className="mr-2 h-4 w-4" />달력메모</TabsTrigger>
-            <TabsTrigger value="reminder" className="rounded-2xl border bg-white py-3"><Bell className="mr-2 h-4 w-4" />예정일</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="home" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
-              <SummaryCard title="총 개체수" value={`${currency(totalInventory)} 마리`} />
-              <SummaryCard title="총 매출" value={`${currency(totalSales)} 원`} />
-              <SummaryCard title="총 비용" value={`${currency(totalExpense)} 원`} />
-              <SummaryCard title="순이익" value={`${currency(netProfit)} 원`} />
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle>최근 작업기록</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {recentRecords.length === 0 ? (
-                    <p className="text-sm text-slate-500">아직 작업기록이 없습니다.</p>
-                  ) : (
-                    recentRecords.map((item) => (
-                      <div key={item.id} className="rounded-2xl border p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">{item.date} · {item.building}</div>
-                          {item.flippedPlates && <Badge>판뒤집기</Badge>}
-                        </div>
-                        <div className="mt-2 text-sm text-slate-600">
-                          아침 {item.morningTemp || "-"}℃ / 저녁 {item.eveningTemp || "-"}℃ / 사료 {item.feedAmount || "-"}
-                        </div>
-                        {item.note && <div className="mt-2 text-sm text-slate-500">{item.note}</div>}
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle>오늘 일정/메모</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(memosByDate[todayString()] || []).length === 0 ? (
-                    <p className="text-sm text-slate-500">오늘 등록된 메모가 없습니다.</p>
-                  ) : (
-                    (memosByDate[todayString()] || []).map((memo) => (
-                      <div key={memo.id} className="rounded-2xl border p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">{memo.title}</div>
-                          <Badge variant="secondary">{memo.type}</Badge>
-                        </div>
-                        {memo.detail && <div className="mt-2 text-sm text-slate-600">{memo.detail}</div>}
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader><CardTitle>다가오는 일정</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {upcomingMemos.length === 0 ? (
-                    <p className="text-sm text-slate-500">등록된 예정 일정이 없습니다.</p>
-                  ) : (
-                    upcomingMemos.map((memo) => (
-                      <div key={memo.id} className="rounded-2xl border p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="font-medium">{memo.date} · {memo.title}</div>
-                          <Badge variant="secondary">{memo.type}</Badge>
-                        </div>
-                        {memo.detail && <div className="mt-2 text-sm text-slate-600">{memo.detail}</div>}
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader><CardTitle>알림 / 설치</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="rounded-2xl border p-4">
-                    <div className="font-medium">브라우저 알림</div>
-                    <p className="mt-2 text-sm text-slate-600">앱을 열었을 때 오늘 일정이 알림으로 뜹니다.</p>
-                    <Button className="mt-3 rounded-2xl" onClick={enableNotifications}><Bell className="mr-2 h-4 w-4" />알림 켜기</Button>
-                  </div>
-                  <div className="rounded-2xl border p-4">
-                    <div className="font-medium">앱처럼 설치</div>
-                    <p className="mt-2 text-sm text-slate-600">안드로이드에서는 크롬 메뉴의 홈 화면에 추가로 설치할 수 있습니다.</p>
-                    <Button variant="outline" className="mt-3 rounded-2xl" onClick={installApp}><Download className="mr-2 h-4 w-4" />설치 창 열기</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="records" className="space-y-6">
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>작업기록 추가</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <Field label="날짜"><Input type="date" value={recordForm.date} onChange={(e) => setRecordForm({ ...recordForm, date: e.target.value })} /></Field>
-                  <Field label="동 선택">
-                    <Select value={recordForm.building} onValueChange={(value) => setRecordForm({ ...recordForm, building: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['1동','2동','3동','4동','5동'].map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="사료 투입량"><Input placeholder="예: 12kg" value={recordForm.feedAmount} onChange={(e) => setRecordForm({ ...recordForm, feedAmount: e.target.value })} /></Field>
-                  <Field label="아침 온도"><Input placeholder="예: 13.5" value={recordForm.morningTemp} onChange={(e) => setRecordForm({ ...recordForm, morningTemp: e.target.value })} /></Field>
-                  <Field label="저녁 온도"><Input placeholder="예: 12.8" value={recordForm.eveningTemp} onChange={(e) => setRecordForm({ ...recordForm, eveningTemp: e.target.value })} /></Field>
-                  <Field label="판뒤집기 여부">
-                    <Select value={recordForm.flippedPlates ? "yes" : "no"} onValueChange={(value) => setRecordForm({ ...recordForm, flippedPlates: value === "yes" })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">함</SelectItem>
-                        <SelectItem value="no">안함</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </div>
-                <div className="mt-4">
-                  <Label>메모</Label>
-                  <Textarea className="mt-2 min-h-28" placeholder="예: 4동 판 뒤집기 완료, 기조 상태 양호" value={recordForm.note} onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })} />
-                </div>
-                <Button className="mt-4 rounded-2xl" onClick={addDailyRecord}><Plus className="mr-2 h-4 w-4" />기록 저장</Button>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader><CardTitle>저장된 작업기록</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {data.dailyRecords.length === 0 ? <p className="text-sm text-slate-500">저장된 기록이 없습니다.</p> : data.dailyRecords.map((item) => (
-                    <div key={item.id} className="rounded-2xl border p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold">{item.date} · {item.building}</div>
-                          <div className="mt-1 text-sm text-slate-600">아침 {item.morningTemp || "-"}℃ / 저녁 {item.eveningTemp || "-"}℃ / 사료 {item.feedAmount || "-"}</div>
-                          {item.note && <div className="mt-2 text-sm text-slate-500 whitespace-pre-wrap">{item.note}</div>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {item.flippedPlates && <Badge>판뒤집기</Badge>}
-                          <Button variant="ghost" size="icon" onClick={() => deleteItem("dailyRecords", item.id)}><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="inventory" className="space-y-6">
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader><CardTitle>동별 개체수 관리</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {data.inventory.map((item, index) => (
-                    <Card key={item.building} className="rounded-3xl shadow-none">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{item.building}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Field label="개체수">
-                          <Input type="number" value={item.count} onChange={(e) => updateInventory(index, "count", e.target.value)} />
-                        </Field>
-                        <Field label="메모">
-                          <Textarea value={item.note} onChange={(e) => updateInventory(index, "note", e.target.value)} placeholder="예: 폐사 관찰, 분산 필요" />
-                        </Field>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="profit" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader><CardTitle>비용 입력</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <Field label="날짜"><Input type="date" value={expenseForm.date} onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })} /></Field>
-                  <Field label="항목">
-                    <Select value={expenseForm.category} onValueChange={(value) => setExpenseForm({ ...expenseForm, category: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['사료비','전기세','인건비','임대료','종자비','기타'].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="금액"><Input type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="원 단위 입력" /></Field>
-                  <Field label="메모"><Input value={expenseForm.note} onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })} /></Field>
-                  <Button className="rounded-2xl" onClick={addExpense}><Plus className="mr-2 h-4 w-4" />비용 저장</Button>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader><CardTitle>매출 입력</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <Field label="날짜"><Input type="date" value={saleForm.date} onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })} /></Field>
-                  <Field label="품목"><Input value={saleForm.item} onChange={(e) => setSaleForm({ ...saleForm, item: e.target.value })} placeholder="예: 치패, 전복장" /></Field>
-                  <Field label="판매 수량"><Input type="number" value={saleForm.quantity} onChange={(e) => setSaleForm({ ...saleForm, quantity: e.target.value })} placeholder="예: 100000" /></Field>
-                  <Field label="단가"><Input type="number" value={saleForm.unitPrice} onChange={(e) => setSaleForm({ ...saleForm, unitPrice: e.target.value })} placeholder="예: 350" /></Field>
-                  <Field label="메모"><Input value={saleForm.note} onChange={(e) => setSaleForm({ ...saleForm, note: e.target.value })} /></Field>
-                  <Button className="rounded-2xl" onClick={addSale}><Plus className="mr-2 h-4 w-4" />매출 저장</Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <SummaryCard title="총매출" value={`${currency(totalSales)} 원`} />
-              <SummaryCard title="총비용" value={`${currency(totalExpense)} 원`} />
-              <SummaryCard title="순이익" value={`${currency(netProfit)} 원`} />
-            </div>
-
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader><CardTitle>비용 / 매출 내역</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h3 className="mb-3 font-semibold">비용</h3>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>날짜</TableHead><TableHead>항목</TableHead><TableHead>금액</TableHead><TableHead>메모</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {data.expenses.map((item) => (
-                        <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell>{item.category}</TableCell><TableCell>{currency(item.amount)}원</TableCell><TableCell>{item.note}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => deleteItem("expenses", item.id)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div>
-                  <h3 className="mb-3 font-semibold">매출</h3>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>날짜</TableHead><TableHead>품목</TableHead><TableHead>수량</TableHead><TableHead>단가</TableHead><TableHead>합계</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {data.sales.map((item) => (
-                        <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell>{item.item}</TableCell><TableCell>{currency(item.quantity)}</TableCell><TableCell>{currency(item.unitPrice)}원</TableCell><TableCell>{currency(item.quantity * item.unitPrice)}원</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => deleteItem("sales", item.id)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="calendar" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle>{monthLabel(selectedMonth)}</CardTitle>
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="rounded-2xl" onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1))}>이전달</Button>
-                      <Button variant="outline" className="rounded-2xl" onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1))}>다음달</Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium text-slate-500">
-                    {['일','월','화','수','목','금','토'].map((d) => <div key={d}>{d}</div>)}
-                  </div>
-                  <div className="mt-2 grid grid-cols-7 gap-2">
-                    {monthDays.map((day, idx) => {
-                      if (!day) return <div key={`blank-${idx}`} className="min-h-28 rounded-2xl bg-transparent" />;
-                      const dateStr = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
-                      const dayMemos = memosByDate[dateStr] || [];
-                      const isToday = dateStr === todayString();
-                      return (
-                        <div key={dateStr} className={`min-h-28 rounded-2xl border bg-white p-2 ${isToday ? 'ring-2 ring-slate-900' : ''}`}>
-                          <div className="text-sm font-semibold">{day.getDate()}</div>
-                          <div className="mt-2 space-y-1">
-                            {dayMemos.slice(0, 3).map((memo) => (
-                              <div key={memo.id} className="rounded-xl bg-slate-100 px-2 py-1 text-[11px] leading-tight">
-                                {memo.title}
-                              </div>
-                            ))}
-                            {dayMemos.length > 3 && <div className="text-[11px] text-slate-500">+{dayMemos.length - 3}건 더보기</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardHeader><CardTitle>메모 / 일정 추가</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <Field label="날짜"><Input type="date" value={memoForm.date} onChange={(e) => setMemoForm({ ...memoForm, date: e.target.value })} /></Field>
-                  <Field label="구분">
-                    <Select value={memoForm.type} onValueChange={(value) => setMemoForm({ ...memoForm, type: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['일정','작업','구매','방문','중요'].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="제목"><Input value={memoForm.title} onChange={(e) => setMemoForm({ ...memoForm, title: e.target.value })} placeholder="예: 4동 판 뒤집기" /></Field>
-                  <Field label="상세내용"><Textarea value={memoForm.detail} onChange={(e) => setMemoForm({ ...memoForm, detail: e.target.value })} placeholder="예: 오늘 4동 전체 뒤집기 완료 / 내일 쉘터 도착 1150장" /></Field>
-                  <Button className="rounded-2xl" onClick={addMemo}><Plus className="mr-2 h-4 w-4" />달력에 저장</Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="reminder" className="space-y-6">
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader><CardTitle>앱 설치 / APK 안내</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm text-slate-600">
-                <div className="rounded-2xl border p-4">
-                  <div className="mb-2 flex items-center gap-2 font-medium text-slate-900"><Smartphone className="h-4 w-4" />가장 쉬운 방법</div>
-                  <p>배포 후 안드로이드 크롬에서 이 앱을 열고 메뉴에서 <span className="font-medium">홈 화면에 추가</span> 또는 <span className="font-medium">앱 설치</span>를 누르면 앱처럼 사용할 수 있습니다.</p>
-                </div>
-                <div className="rounded-2xl border p-4">
-                  <div className="mb-2 font-medium text-slate-900">진짜 APK로 만들기</div>
-                  <p>이 React 앱을 배포한 뒤 Capacitor로 감싸면 APK 생성이 가능합니다.</p>
-                  <div className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-100 p-3 text-xs">npm install @capacitor/core @capacitor/cli @capacitor/android
-npx cap init
-npm run build
-npx cap add android
-npx cap copy
-npx cap open android</div>
-                  <p className="mt-2">그다음 Android Studio에서 Build &gt; Build APK(s) 하면 설치파일을 만들 수 있습니다.</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="rounded-3xl border-0 shadow-sm">
-              <CardHeader><CardTitle>날짜별 등록 메모 목록</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {[...data.calendarMemos].sort((a, b) => a.date.localeCompare(b.date)).map((memo) => (
-                  <div key={memo.id} className="rounded-2xl border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{memo.date} · {memo.title}</div>
-                        <div className="mt-1"><Badge variant="secondary">{memo.type}</Badge></div>
-                        {memo.detail && <div className="mt-2 text-sm text-slate-600 whitespace-pre-wrap">{memo.detail}</div>}
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => deleteItem("calendarMemos", memo.id)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                ))}
-                {data.calendarMemos.length === 0 && <p className="text-sm text-slate-500">예정된 메모가 없습니다.</p>}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+      <div>
+        <button onClick={() => setTab("home")}>홈</button>
+        <button onClick={() => setTab("inventory")}>개체수</button>
+        <button onClick={() => setTab("money")}>수익</button>
+        <button onClick={() => setTab("calendar")}>메모</button>
       </div>
-    </div>
-  );
-}
 
-function SummaryCard({ title, value }) {
-  return (
-    <Card className="rounded-3xl border-0 shadow-sm">
-      <CardContent className="p-6">
-        <div className="text-sm text-slate-500">{title}</div>
-        <div className="mt-3 text-2xl font-bold">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
+      {tab === "home" && (
+        <div>
+          <h3>총 개체수: {totalInventory}</h3>
+          <h3>총 매출: {totalSales}</h3>
+          <h3>총 비용: {totalExpense}</h3>
+          <h3>순이익: {totalSales - totalExpense}</h3>
+        </div>
+      )}
 
-function Field({ label, children }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
+      {tab === "inventory" && (
+        <div>
+          <h2>개체수 관리</h2>
+          {Object.keys(inventory).map((key) => (
+            <div key={key}>
+              {key}:
+              <input
+                type="number"
+                value={inventory[key]}
+                onChange={(e) =>
+                  setInventory({ ...inventory, [key]: Number(e.target.value) })
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "money" && (
+        <div>
+          <h2>수익관리</h2>
+
+          <button
+            onClick={() =>
+              setExpenses([...expenses, { amount: 100000 }])
+            }
+          >
+            비용 추가 (테스트)
+          </button>
+
+          <button
+            onClick={() =>
+              setSales([...sales, { amount: 200000 }])
+            }
+          >
+            매출 추가 (테스트)
+          </button>
+
+          <h3>총매출: {totalSales}</h3>
+          <h3>총비용: {totalExpense}</h3>
+          <h3>순이익: {totalSales - totalExpense}</h3>
+        </div>
+      )}
+
+      {tab === "calendar" && (
+        <div>
+          <h2>메모</h2>
+
+          <input
+            type="date"
+            onChange={(e) =>
+              setNewMemo({ ...newMemo, date: e.target.value })
+            }
+          />
+
+          <input
+            placeholder="내용"
+            onChange={(e) =>
+              setNewMemo({ ...newMemo, text: e.target.value })
+            }
+          />
+
+          <button
+            onClick={() => setMemos([...memos, newMemo])}
+          >
+            저장
+          </button>
+
+          <h3>메모 목록</h3>
+          {memos.map((m, i) => (
+            <div key={i}>
+              {m.date} - {m.text}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
